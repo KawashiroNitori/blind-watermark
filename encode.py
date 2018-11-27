@@ -1,10 +1,24 @@
 # coding=utf-8
 import cv2
+import pyfftw
 import numpy as np
 import random
+import time
 import os
 from argparse import ArgumentParser
+
 ALPHA = 5
+
+start = time.time()
+last_time = start
+
+
+def stopwatch():
+    global last_time
+    now = time.time()
+    result = now - last_time
+    last_time = now
+    return result
 
 
 def build_parser():
@@ -32,14 +46,15 @@ def main():
 
 def encode(img_path, wm_path, res_path, alpha):
     img = cv2.imread(img_path)
-    img_f = np.fft.fft2(img)
+    img_f = pyfftw.interfaces.numpy_fft.fft2(img)
+    print('FFT cost {:.3f}s'.format(stopwatch()))
     height, width, channel = np.shape(img)
     watermark = cv2.imread(wm_path)
     wm_height, wm_width = watermark.shape[0], watermark.shape[1]
-    x, y = range(int(height / 2)), range(width)
+    x, y = list(range(int(height / 2))), list(range(width))
     random.seed(height + width)
-    random.shuffle(list(x))
-    random.shuffle(list(y))
+    random.shuffle(x)
+    random.shuffle(y)
     tmp = np.zeros(img.shape)
     for i in range(int(height / 2)):
         for j in range(width):
@@ -47,8 +62,12 @@ def encode(img_path, wm_path, res_path, alpha):
                 tmp[i][j] = watermark[x[i]][y[j]]
                 tmp[height - 1 - i][width - 1 - j] = tmp[i][j]
     res_f = img_f + alpha * tmp
-    res = np.fft.ifft2(res_f)
+    res = pyfftw.interfaces.numpy_fft.ifft2(res_f)
+    print('Reverse FFT cost {:.3f}s'.format(stopwatch()))
     res = np.real(res)
     cv2.imwrite(res_path, res, [int(cv2.IMWRITE_JPEG_QUALITY), 100])
+    print('Total cost {:.3f}s'.format(time.time() - start))
+
+
 if __name__ == '__main__':
     main()
